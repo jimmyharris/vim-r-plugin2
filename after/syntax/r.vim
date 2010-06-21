@@ -12,8 +12,9 @@ syn match rComment contains=@Spell /\#.*/
 syn region rString contains=rSpecial,@Spell start=/"/ skip=/\\\\\|\\"/ end=/"/
 syn region rString contains=rSpecial,@Spell start=/'/ skip=/\\\\\|\\'/ end=/'/
 syn match   rOperator    /[\*\!\%\&\+\-\<\>\=\^\|\~\`/:@]/
-syn match   rOperator    /%o%\|%x%\|xor\|isTRUE/
+syn match   rOperator    /%o%\|%x%\|xor\|isTRUE\|%in%/
 syn match rDollar /\$/
+syn keyword rBoolError true false
 " Load functions file
 let g:rfunfile = expand("<sfile>:h:h:h") . "/tools/rfunctions"
 if filereadable(g:rfunfile)
@@ -26,4 +27,5 @@ hi def link rSpecial SpecialChar
 hi def link rFunction Function
 hi def link rOperator Operator
 hi def link rPreProc PreProc
+hi def link rBoolError Error
 

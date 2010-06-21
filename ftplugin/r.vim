@@ -216,35 +216,10 @@ function! GoDown()
   endwhile
 endfunction
 
-function! ReplaceUnderS()
-  let j = col(".")
-  let s = getline(".")
-  if j > 3 && s[j-3] == "<" && s[j-2] == "-" && s[j-1] == " "
-    execute "normal! 3h3xr_"
-    return
-  endif
-  let isString = 0
-  let i = 0
-  while i < j
-    if s[i] == '"'
-      if isString == 0
-	let isString = 1
-      else
-	let isString = 0
-      endif
-    endif
-    let i += 1
-  endwhile
-  if isString == 0
-    execute "normal! a <- "
-  else
-    execute "normal! a_"
-  endif
-endfunction
 
-" Replace 'underline' with '<-'
+" Replace '<C-->' with '<-'
 if b:replace_us
-  imap <buffer> _ <Esc>:call ReplaceUnderS()<CR>a
+  imap  <Space><-<Space>
 endif
 
 function! RWriteScreenRC()
@@ -298,7 +273,7 @@ function! StartR(whatr)
       let scrrc = RWriteScreenRC()
     endif
     " Some terminals want quotes (see screen.vim)
-    if b:term_cmd =~ "gnome-terminal" || b:term_cmd =~ "xfce4-terminal"
+    if b:term_cmd =~ "gnome-terminal" || b:term_cmd =~ "xfce4-terminal" || b:term_cmd =~ "iterm"
       let opencmd = printf("%s 'screen %s -d -RR -S %s %s' &", b:term_cmd, scrrc, b:screensname, rcmd)
     else
       let opencmd = printf("%s screen %s -d -RR -S %s %s &", b:term_cmd, scrrc, b:screensname, rcmd)
@@ -908,202 +883,202 @@ call s:RCreateMaps("nvi", '<Plug>RBuildTags',    'ro', ':call BuildRTags("Global
 "-------------------------------------
 "call s:RCreateMaps("nvi", '<Plug>RDebug', 'dd', ':call RStartDebug()')
 
+if(has('gui_running'))
+	function! s:RCreateMenuItem(type, label, plug, combo, target)
+		if a:type =~ '0'
+			let tg = a:target . '<CR>0'
+			let il = 'i'
+		else
+			let tg = a:target . '<CR>'
+			let il = 'a'
+		endif
+		if a:type =~ "n"
+			if hasmapto(a:plug, "n")
+				exec 'nmenu &R.' . a:label . ' ' . tg
+			else
+				exec 'nmenu &R.' . a:label . '<Tab>\\' . a:combo . ' ' . tg
+			endif
+		endif
+		if a:type =~ "v"
+			if hasmapto(a:plug, "v")
+				exec 'vmenu &R.' . a:label . ' ' . tg
+			else
+				exec 'vmenu &R.' . a:label . '<Tab>\\' . a:combo . ' ' . '<Esc>' . tg
+			endif
+		endif
+		if a:type =~ "i"
+			if hasmapto(a:plug, "i")
+				exec 'imenu &R.' . a:label . ' ' . tg . il
+			else
+				exec 'imenu &R.' . a:label . '<Tab>\\' . a:combo . ' ' . '<Esc>' . tg . il
+			endif
+		endif
+	endfunction
 
-function! s:RCreateMenuItem(type, label, plug, combo, target)
-  if a:type =~ '0'
-    let tg = a:target . '<CR>0'
-    let il = 'i'
-  else
-    let tg = a:target . '<CR>'
-    let il = 'a'
-  endif
-  if a:type =~ "n"
-    if hasmapto(a:plug, "n")
-      exec 'nmenu &R.' . a:label . ' ' . tg
-    else
-      exec 'nmenu &R.' . a:label . '<Tab>\\' . a:combo . ' ' . tg
-    endif
-  endif
-  if a:type =~ "v"
-    if hasmapto(a:plug, "v")
-      exec 'vmenu &R.' . a:label . ' ' . tg
-    else
-      exec 'vmenu &R.' . a:label . '<Tab>\\' . a:combo . ' ' . '<Esc>' . tg
-    endif
-  endif
-  if a:type =~ "i"
-    if hasmapto(a:plug, "i")
-      exec 'imenu &R.' . a:label . ' ' . tg . il
-    else
-      exec 'imenu &R.' . a:label . '<Tab>\\' . a:combo . ' ' . '<Esc>' . tg . il
-    endif
-  endif
-endfunction
+	" Menu R
+	function! MakeRMenu()
+		if b:hasrmenu == 1
+			return
+		endif
 
-" Menu R
-function! MakeRMenu()
-  if b:hasrmenu == 1
-    return
-  endif
+		"----------------------------------------------------------------------------
+		" Start/Close
+		"----------------------------------------------------------------------------
+		call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ (default)', '<Plug>RStart', 'rf', ':call StartR("R")')
+		call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ --vanilla', '<Plug>RvanillaStart', 'rv', ':call StartR("vanilla")')
+		call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ (custom)', '<Plug>RCustomStart', 'rc', ':call StartR("custom")')
+		"-------------------------------
+		menu R.Start/Close.-Sep1- <nul>
+		call s:RCreateMenuItem("nvi", 'Start/Close.Close\ R\ (no\ save)', '<Plug>RClose', 'rq', ":call SendCmdToScreen('quit(save = \"no\")')")
+		call s:RCreateMenuItem("nvi", 'Start/Close.Close\ R\ (save\ workspace)', '<Plug>RSaveClose', 'rw', ":call SendCmdToScreen('quit(save = \"yes\")')")
 
-  "----------------------------------------------------------------------------
-  " Start/Close
-  "----------------------------------------------------------------------------
-  call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ (default)', '<Plug>RStart', 'rf', ':call StartR("R")')
-  call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ --vanilla', '<Plug>RvanillaStart', 'rv', ':call StartR("vanilla")')
-  call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ (custom)', '<Plug>RCustomStart', 'rc', ':call StartR("custom")')
-  "-------------------------------
-  menu R.Start/Close.-Sep1- <nul>
-  call s:RCreateMenuItem("nvi", 'Start/Close.Close\ R\ (no\ save)', '<Plug>RClose', 'rq', ":call SendCmdToScreen('quit(save = \"no\")')")
-  call s:RCreateMenuItem("nvi", 'Start/Close.Close\ R\ (save\ workspace)', '<Plug>RSaveClose', 'rw', ":call SendCmdToScreen('quit(save = \"yes\")')")
+		"----------------------------------------------------------------------------
+		" Send
+		"----------------------------------------------------------------------------
+		call s:RCreateMenuItem("ni", 'Send.File', '<Plug>RSendFile', 'aa', ':call SendFileToR("silent")')
+		call s:RCreateMenuItem("ni", 'Send.File\ (echo)', '<Plug>RESendFile', 'ae', ':call SendFileToR("echo")')
+		"-------------------------------
+		menu R.Send.-Sep1- <nul>
+		call s:RCreateMenuItem("ni", 'Send.Block\ (cur)', '<Plug>RSendMBlock', 'bb', ':call SendMBlockToR("silent", "stay")')
+		call s:RCreateMenuItem("ni", 'Send.Block\ (cur,\ echo)', '<Plug>RESendMBlock', 'be', ':call SendMBlockToR("echo", "stay")')
+		call s:RCreateMenuItem("ni", 'Send.Block\ (cur,\ down)', '<Plug>RDSendMBlock', 'bd', ':call SendMBlockToR("silent", "down")')
+		call s:RCreateMenuItem("ni", 'Send.Block\ (cur,\ echo\ and\ down)', '<Plug>REDSendMBlock', 'ba', ':call SendMBlockToR("echo", "down")')
+		"-------------------------------
+		menu R.Send.-Sep2- <nul>
+		call s:RCreateMenuItem("ni", 'Send.Function\ (cur)', '<Plug>RSendFunction', 'ff', ':call SendFunctionToR("silent", "stay")')
+		call s:RCreateMenuItem("ni", 'Send.Function\ (cur,\ echo)', '<Plug>RESendFunction', 'fe', ':call SendFunctionToR("echo", "stay")')
+		call s:RCreateMenuItem("ni", 'Send.Function\ (cur\ and\ down)', '<Plug>RDSendFunction', 'fd', ':call SendFunctionToR("silent", "down")')
+		call s:RCreateMenuItem("ni", 'Send.Function\ (cur,\ echo\ and\ down)', '<Plug>REDSendFunction', 'fa', ':call SendFunctionToR("echo", "down")')
+		"-------------------------------
+		menu R.Send.-Sep3- <nul>
+		call s:RCreateMenuItem("v0", 'Send.Selection', '<Plug>RSendSelection', 'ss', ':call SendSelectionToR("silent", "stay")')
+		call s:RCreateMenuItem("v0", 'Send.Selection\ (echo)', '<Plug>RESendSelection', 'se', ':call SendSelectionToR("echo", "stay")')
+		call s:RCreateMenuItem("v0", 'Send.Selection\ (and\ down)', '<Plug>RDSendSelection', 'sd', ':call SendSelectionToR("silent", "down")')
+		call s:RCreateMenuItem("v0", 'Send.Selection\ (echo\ and\ down)', '<Plug>REDSendSelection', 'sa', ':call SendSelectionToR("echo", "down")')
+		"-------------------------------
+		menu R.Send.-Sep4- <nul>
+		call s:RCreateMenuItem("ni", 'Send.Paragraph', '<Plug>RSendParagraph', 'pp', ':call SendParagraphToR("silent", "stay")')
+		call s:RCreateMenuItem("ni", 'Send.Paragraph\ (echo)', '<Plug>RESendParagraph', 'pe', ':call SendParagraphToR("echo", "stay")')
+		call s:RCreateMenuItem("ni", 'Send.Paragraph\ (and\ down)', '<Plug>RDSendParagraph', 'pd', ':call SendParagraphToR("silent", "down")')
+		call s:RCreateMenuItem("ni", 'Send.Paragraph\ (echo\ and\ down)', '<Plug>REDSendParagraph', 'pa', ':call SendParagraphToR("echo", "down")')
+		"-------------------------------
+		menu R.Send.-Sep5- <nul>
+		call s:RCreateMenuItem("ni0", 'Send.Line', '<Plug>RSendLine', 'l', ':call SendLineToR("stay")')
+		call s:RCreateMenuItem("ni0", 'Send.Line\ (and\ down)', '<Plug>RDSendLine', 'd', ':call SendLineToR("down")')
 
-  "----------------------------------------------------------------------------
-  " Send
-  "----------------------------------------------------------------------------
-  call s:RCreateMenuItem("ni", 'Send.File', '<Plug>RSendFile', 'aa', ':call SendFileToR("silent")')
-  call s:RCreateMenuItem("ni", 'Send.File\ (echo)', '<Plug>RESendFile', 'ae', ':call SendFileToR("echo")')
-  "-------------------------------
-  menu R.Send.-Sep1- <nul>
-  call s:RCreateMenuItem("ni", 'Send.Block\ (cur)', '<Plug>RSendMBlock', 'bb', ':call SendMBlockToR("silent", "stay")')
-  call s:RCreateMenuItem("ni", 'Send.Block\ (cur,\ echo)', '<Plug>RESendMBlock', 'be', ':call SendMBlockToR("echo", "stay")')
-  call s:RCreateMenuItem("ni", 'Send.Block\ (cur,\ down)', '<Plug>RDSendMBlock', 'bd', ':call SendMBlockToR("silent", "down")')
-  call s:RCreateMenuItem("ni", 'Send.Block\ (cur,\ echo\ and\ down)', '<Plug>REDSendMBlock', 'ba', ':call SendMBlockToR("echo", "down")')
-  "-------------------------------
-  menu R.Send.-Sep2- <nul>
-  call s:RCreateMenuItem("ni", 'Send.Function\ (cur)', '<Plug>RSendFunction', 'ff', ':call SendFunctionToR("silent", "stay")')
-  call s:RCreateMenuItem("ni", 'Send.Function\ (cur,\ echo)', '<Plug>RESendFunction', 'fe', ':call SendFunctionToR("echo", "stay")')
-  call s:RCreateMenuItem("ni", 'Send.Function\ (cur\ and\ down)', '<Plug>RDSendFunction', 'fd', ':call SendFunctionToR("silent", "down")')
-  call s:RCreateMenuItem("ni", 'Send.Function\ (cur,\ echo\ and\ down)', '<Plug>REDSendFunction', 'fa', ':call SendFunctionToR("echo", "down")')
-  "-------------------------------
-  menu R.Send.-Sep3- <nul>
-  call s:RCreateMenuItem("v0", 'Send.Selection', '<Plug>RSendSelection', 'ss', ':call SendSelectionToR("silent", "stay")')
-  call s:RCreateMenuItem("v0", 'Send.Selection\ (echo)', '<Plug>RESendSelection', 'se', ':call SendSelectionToR("echo", "stay")')
-  call s:RCreateMenuItem("v0", 'Send.Selection\ (and\ down)', '<Plug>RDSendSelection', 'sd', ':call SendSelectionToR("silent", "down")')
-  call s:RCreateMenuItem("v0", 'Send.Selection\ (echo\ and\ down)', '<Plug>REDSendSelection', 'sa', ':call SendSelectionToR("echo", "down")')
-  "-------------------------------
-  menu R.Send.-Sep4- <nul>
-  call s:RCreateMenuItem("ni", 'Send.Paragraph', '<Plug>RSendParagraph', 'pp', ':call SendParagraphToR("silent", "stay")')
-  call s:RCreateMenuItem("ni", 'Send.Paragraph\ (echo)', '<Plug>RESendParagraph', 'pe', ':call SendParagraphToR("echo", "stay")')
-  call s:RCreateMenuItem("ni", 'Send.Paragraph\ (and\ down)', '<Plug>RDSendParagraph', 'pd', ':call SendParagraphToR("silent", "down")')
-  call s:RCreateMenuItem("ni", 'Send.Paragraph\ (echo\ and\ down)', '<Plug>REDSendParagraph', 'pa', ':call SendParagraphToR("echo", "down")')
-  "-------------------------------
-  menu R.Send.-Sep5- <nul>
-  call s:RCreateMenuItem("ni0", 'Send.Line', '<Plug>RSendLine', 'l', ':call SendLineToR("stay")')
-  call s:RCreateMenuItem("ni0", 'Send.Line\ (and\ down)', '<Plug>RDSendLine', 'd', ':call SendLineToR("down")')
+		" We can't call RCreateMenuItem because of the 'o' command at the end of the map:
+		if hasmapto('<Plug>RSendLAndOpenNewOne')
+			imenu R.Send.Line\ (and\ new\ one) <Plug>RSendLAndOpenNewOne <Esc>:call SendLineToR("stay")<CR>o
+		else
+			imenu R.Send.Line\ (and\ new\ one)<Tab>\\q <Esc>:call SendLineToR("stay")<CR>o
+		endif
 
-  " We can't call RCreateMenuItem because of the 'o' command at the end of the map:
-  if hasmapto('<Plug>RSendLAndOpenNewOne')
-    imenu R.Send.Line\ (and\ new\ one) <Plug>RSendLAndOpenNewOne <Esc>:call SendLineToR("stay")<CR>o
-  else
-    imenu R.Send.Line\ (and\ new\ one)<Tab>\\q <Esc>:call SendLineToR("stay")<CR>o
-  endif
+		"----------------------------------------------------------------------------
+		" Control
+		"----------------------------------------------------------------------------
+		call s:RCreateMenuItem("nvi", 'Control.List\ space', '<Plug>RListSpace', 'rl', ':call SendCmdToScreen("ls()")')
+		call s:RCreateMenuItem("nvi", 'Control.Clear\ console\ screen', '<Plug>RClearConsole', 'rr', ':call SendCmdToScreen("")')
+		call s:RCreateMenuItem("nvi", 'Control.Clear\ all', '<Plug>RClearAll', 'rm', ':call RClearAll()')
+		"-------------------------------
+		menu R.Control.-Sep1- <nul>
+		call s:RCreateMenuItem("nvi", 'Control.Object\ (print)', '<Plug>RObjectPr', 'rp', ':call RAction("print")')
+		call s:RCreateMenuItem("nvi", 'Control.Object\ (names)', '<Plug>RObjectNames', 'rn', ':call RAction("names")')
+		call s:RCreateMenuItem("nvi", 'Control.Object\ (str)', '<Plug>RObjectStr', 'rt', ':call RAction("str")')
+		"-------------------------------
+		menu R.Control.-Sep2- <nul>
+		call s:RCreateMenuItem("nvi", 'Control.Arguments\ (cur)', '<Plug>RShowArgs', 'ra', ':call RAction("args")')
+		call s:RCreateMenuItem("nvi", 'Control.Example\ (cur)', '<Plug>RShowEx', 're', ':call RAction("example")')
+		call s:RCreateMenuItem("nvi", 'Control.Help\ (cur)', '<Plug>RHelp', 'rh', ':call RAction("help")')
+		"-------------------------------
+		menu R.Control.-Sep3- <nul>
+		call s:RCreateMenuItem("nvi", 'Control.Summary\ (cur)', '<Plug>RSummary', 'rs', ':call RAction("summary")')
+		call s:RCreateMenuItem("nvi", 'Control.Plot\ (cur)', '<Plug>RPlot', 'rg', ':call RAction("plot")')
+		call s:RCreateMenuItem("nvi", 'Control.Plot\ and\ summary\ (cur)', '<Plug>RSPlot', 'rb', ':call RAction("plot")<CR>:call RAction("summary")')
+		"-------------------------------
+		menu R.Control.-Sep4- <nul>
+		call s:RCreateMenuItem("nvi", 'Control.Set\ working\ directory\ (cur\ file\ path)', '<Plug>RSetwd', 'rd', ':call RSetWD()')
+		"-------------------------------
+		menu R.Control.-Sep5- <nul>
+		call s:RCreateMenuItem("nvi", 'Control.Sweave\ (cur\ file)', '<Plug>RSweave', 'sw', ':call RSweave()')
+		call s:RCreateMenuItem("nvi", 'Control.Sweave\ and\ PDF\ (cur\ file)', '<Plug>RMakePDF', 'sp', ':call RMakePDF()')
+		"-------------------------------
+		menu R.Control.-Sep6- <nul>
+		call s:RCreateMenuItem("nvi", 'Control.Rebuild\ list\ of\ objects', '<Plug>RBuildTags', 'ro', ':call BuildRTags("GlobalEnv")')
+		"-------------------------------
+		menu R.-Sep7- <nul>
 
-  "----------------------------------------------------------------------------
-  " Control
-  "----------------------------------------------------------------------------
-  call s:RCreateMenuItem("nvi", 'Control.List\ space', '<Plug>RListSpace', 'rl', ':call SendCmdToScreen("ls()")')
-  call s:RCreateMenuItem("nvi", 'Control.Clear\ console\ screen', '<Plug>RClearConsole', 'rr', ':call SendCmdToScreen("")')
-  call s:RCreateMenuItem("nvi", 'Control.Clear\ all', '<Plug>RClearAll', 'rm', ':call RClearAll()')
-  "-------------------------------
-  menu R.Control.-Sep1- <nul>
-  call s:RCreateMenuItem("nvi", 'Control.Object\ (print)', '<Plug>RObjectPr', 'rp', ':call RAction("print")')
-  call s:RCreateMenuItem("nvi", 'Control.Object\ (names)', '<Plug>RObjectNames', 'rn', ':call RAction("names")')
-  call s:RCreateMenuItem("nvi", 'Control.Object\ (str)', '<Plug>RObjectStr', 'rt', ':call RAction("str")')
-  "-------------------------------
-  menu R.Control.-Sep2- <nul>
-  call s:RCreateMenuItem("nvi", 'Control.Arguments\ (cur)', '<Plug>RShowArgs', 'ra', ':call RAction("args")')
-  call s:RCreateMenuItem("nvi", 'Control.Example\ (cur)', '<Plug>RShowEx', 're', ':call RAction("example")')
-  call s:RCreateMenuItem("nvi", 'Control.Help\ (cur)', '<Plug>RHelp', 'rh', ':call RAction("help")')
-  "-------------------------------
-  menu R.Control.-Sep3- <nul>
-  call s:RCreateMenuItem("nvi", 'Control.Summary\ (cur)', '<Plug>RSummary', 'rs', ':call RAction("summary")')
-  call s:RCreateMenuItem("nvi", 'Control.Plot\ (cur)', '<Plug>RPlot', 'rg', ':call RAction("plot")')
-  call s:RCreateMenuItem("nvi", 'Control.Plot\ and\ summary\ (cur)', '<Plug>RSPlot', 'rb', ':call RAction("plot")<CR>:call RAction("summary")')
-  "-------------------------------
-  menu R.Control.-Sep4- <nul>
-  call s:RCreateMenuItem("nvi", 'Control.Set\ working\ directory\ (cur\ file\ path)', '<Plug>RSetwd', 'rd', ':call RSetWD()')
-  "-------------------------------
-  menu R.Control.-Sep5- <nul>
-  call s:RCreateMenuItem("nvi", 'Control.Sweave\ (cur\ file)', '<Plug>RSweave', 'sw', ':call RSweave()')
-  call s:RCreateMenuItem("nvi", 'Control.Sweave\ and\ PDF\ (cur\ file)', '<Plug>RMakePDF', 'sp', ':call RMakePDF()')
-  "-------------------------------
-  menu R.Control.-Sep6- <nul>
-  call s:RCreateMenuItem("nvi", 'Control.Rebuild\ list\ of\ objects', '<Plug>RBuildTags', 'ro', ':call BuildRTags("GlobalEnv")')
-  "-------------------------------
-  menu R.-Sep7- <nul>
+		"----------------------------------------------------------------------------
+		" About
+		"----------------------------------------------------------------------------
+		amenu R.About\ the\ plugin :help vim-r-plugin<CR>
 
-  "----------------------------------------------------------------------------
-  " About
-  "----------------------------------------------------------------------------
-  amenu R.About\ the\ plugin :help vim-r-plugin<CR>
+		"----------------------------------------------------------------------------
+		" ToolBar
+		"----------------------------------------------------------------------------
+		" Buttons
+		amenu icon=r-start ToolBar.RStart :call StartR("R")<CR>
+		amenu icon=r-close ToolBar.RClose :call SendCmdToScreen('quit(save = "no")')<CR>
+		"---------------------------
+		amenu icon=r-send-file ToolBar.RSendFile :call SendFileToR("echo")<CR>
+		amenu icon=r-send-block ToolBar.RSendBlock :call SendMBlockToR("echo", "down")<CR>
+		amenu icon=r-send-function ToolBar.RSendFunction :call SendFunctionToR("echo", "down")<CR>
+		vmenu icon=r-send-selection ToolBar.RSendSelection <ESC>:call SendSelectionToR("echo", "down")<CR>
+		amenu icon=r-send-paragraph ToolBar.RSendParagraph <ESC>:call SendParagraphToR("echo", "down")<CR>
+		amenu icon=r-send-line ToolBar.RSendLine :call SendLineToR("down")<CR>
+		"---------------------------
+		amenu icon=r-control-listspace ToolBar.RListSpace :call SendCmdToScreen("ls()")<CR>
+		amenu icon=r-control-clear ToolBar.RClear :call SendCmdToScreen("")<CR>
+		amenu icon=r-control-clearall ToolBar.RClearAll :call RClearAll()<CR>
 
-  "----------------------------------------------------------------------------
-  " ToolBar
-  "----------------------------------------------------------------------------
-  " Buttons
-  amenu icon=r-start ToolBar.RStart :call StartR("R")<CR>
-  amenu icon=r-close ToolBar.RClose :call SendCmdToScreen('quit(save = "no")')<CR>
-  "---------------------------
-  amenu icon=r-send-file ToolBar.RSendFile :call SendFileToR("echo")<CR>
-  amenu icon=r-send-block ToolBar.RSendBlock :call SendMBlockToR("echo", "down")<CR>
-  amenu icon=r-send-function ToolBar.RSendFunction :call SendFunctionToR("echo", "down")<CR>
-  vmenu icon=r-send-selection ToolBar.RSendSelection <ESC>:call SendSelectionToR("echo", "down")<CR>
-  amenu icon=r-send-paragraph ToolBar.RSendParagraph <ESC>:call SendParagraphToR("echo", "down")<CR>
-  amenu icon=r-send-line ToolBar.RSendLine :call SendLineToR("down")<CR>
-  "---------------------------
-  amenu icon=r-control-listspace ToolBar.RListSpace :call SendCmdToScreen("ls()")<CR>
-  amenu icon=r-control-clear ToolBar.RClear :call SendCmdToScreen("")<CR>
-  amenu icon=r-control-clearall ToolBar.RClearAll :call RClearAll()<CR>
+		" Hints
+		tmenu ToolBar.RStart Start R (default)
+		tmenu ToolBar.RClose Close R (no save)
+		tmenu ToolBar.RSendFile Send file (echo)
+		tmenu ToolBar.RSendBlock Send block (cur, echo and down)
+		tmenu ToolBar.RSendFunction Send function (cur, echo and down)
+		tmenu ToolBar.RSendSelection Send selection (cur, echo and down)
+		tmenu ToolBar.RSendParagraph Send paragraph (cur, echo and down)
+		tmenu ToolBar.RSendLine Send line (cur and down)
+		tmenu ToolBar.RListSpace List objects
+		tmenu ToolBar.RClear Clear the console screen
+		tmenu ToolBar.RClearAll Remove objects from workspace and clear the console screen
+		let b:hasrmenu = 1
+	endfunction
 
-  " Hints
-  tmenu ToolBar.RStart Start R (default)
-  tmenu ToolBar.RClose Close R (no save)
-  tmenu ToolBar.RSendFile Send file (echo)
-  tmenu ToolBar.RSendBlock Send block (cur, echo and down)
-  tmenu ToolBar.RSendFunction Send function (cur, echo and down)
-  tmenu ToolBar.RSendSelection Send selection (cur, echo and down)
-  tmenu ToolBar.RSendParagraph Send paragraph (cur, echo and down)
-  tmenu ToolBar.RSendLine Send line (cur and down)
-  tmenu ToolBar.RListSpace List objects
-  tmenu ToolBar.RClear Clear the console screen
-  tmenu ToolBar.RClearAll Remove objects from workspace and clear the console screen
-  let b:hasrmenu = 1
-endfunction
+	function! DeleteScreenRC()
+		if filereadable(b:scrfile)
+			call delete(b:scrfile)
+		endif
+	endfunction
 
-function! DeleteScreenRC()
-  if filereadable(b:scrfile)
-    call delete(b:scrfile)
-  endif
-endfunction
+	function! UnMakeRMenu()
+		call DeleteScreenRC()
+		if b:hasrmenu == 0
+			return
+		endif
+		aunmenu R
+		aunmenu ToolBar.RClearAll
+		aunmenu ToolBar.RClear
+		aunmenu ToolBar.RListSpace
+		aunmenu ToolBar.RSendLine
+		aunmenu ToolBar.RSendSelection
+		aunmenu ToolBar.RSendParagraph
+		aunmenu ToolBar.RSendFunction
+		aunmenu ToolBar.RSendBlock
+		aunmenu ToolBar.RSendFile
+		aunmenu ToolBar.RClose
+		aunmenu ToolBar.RStart
+		let b:hasrmenu = 0
+	endfunction
 
-function! UnMakeRMenu()
-  call DeleteScreenRC()
-  if b:hasrmenu == 0
-    return
-  endif
-  aunmenu R
-  aunmenu ToolBar.RClearAll
-  aunmenu ToolBar.RClear
-  aunmenu ToolBar.RListSpace
-  aunmenu ToolBar.RSendLine
-  aunmenu ToolBar.RSendSelection
-  aunmenu ToolBar.RSendParagraph
-  aunmenu ToolBar.RSendFunction
-  aunmenu ToolBar.RSendBlock
-  aunmenu ToolBar.RSendFile
-  aunmenu ToolBar.RClose
-  aunmenu ToolBar.RStart
-  let b:hasrmenu = 0
-endfunction
-
-" Activate the menu and toolbar buttons if the user sets the file type as 'r':
-call MakeRMenu()
-
-augroup VimRPlugin
-  au FileType * if (&filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp") | call MakeRMenu() | endif
-  au BufEnter * if (&filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp") | call MakeRMenu() | endif
-  au BufLeave * if (&filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp") | call UnMakeRMenu() | endif
-augroup END
+	" Activate the menu and toolbar buttons if the user sets the file type as 'r':
+	call MakeRMenu()
+	augroup VimRPlugin
+		au FileType * if (&filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp") | call MakeRMenu() | endif
+		au BufEnter * if (&filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp") | call MakeRMenu() | endif
+		au BufLeave * if (&filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp") | call UnMakeRMenu() | endif
+	augroup END
+endif
 
 "==========================================================================
 " CHANGELOG FOR DEVELOPERS
