@@ -6,4 +6,5 @@ autocmd BufNewFile,BufRead *.s set ft=r
 autocmd BufNewFile,BufRead *.S set ft=r
 autocmd BufRead *.Rout set ft=rout
 autocmd BufRead *.Rhistory set ft=r
+autocmd BufNewFile,BufRead .RProfile set ft=r
 
