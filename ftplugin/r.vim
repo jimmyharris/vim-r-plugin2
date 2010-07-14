@@ -40,6 +40,10 @@ let b:r_plugin_home = expand("<sfile>:h:h")
 let b:local_rtags_filename = b:r_plugin_home . "/tools/rtags"
 let b:flines1 = readfile(b:local_rtags_filename)
 
+" setup formatoptions for safe and sane source code editing.
+
+setlocal formatoptions-=t formatoptions+=croql
+
 " Special screenrc file
 let b:scrfile = " "
 
