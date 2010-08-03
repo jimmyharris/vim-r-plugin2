@@ -43,6 +43,7 @@ let b:flines1 = readfile(b:local_rtags_filename)
 " setup formatoptions for safe and sane source code editing.
 
 setlocal formatoptions-=t formatoptions+=croql
+setlocal sts=2 ts=2 sw=2 et
 
 " Special screenrc file
 let b:scrfile = " "

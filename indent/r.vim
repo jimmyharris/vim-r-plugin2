@@ -5,13 +5,13 @@
 " Last Change:	May 09, 2009
 
 
-" Only load this indent file when no other was loaded.
+" " Only load this indent file when no other was loaded.
 " if exists("b:did_indent")
 "   finish
 " endif
 " let b:did_indent = 1
 
-" setlocal indentexpr=GetRIndent()
+" " setlocal indentexpr=GetRIndent()
 
 " " Only define the function once.
 " if exists("*GetRIndent")
@@ -184,7 +184,7 @@
 
 " Only load this indent file when no other was loaded.
 if exists("b:did_indent")
-	finish
+  finish
 endif
 let b:did_indent = 1
 
@@ -194,31 +194,66 @@ setlocal indentkeys+=0=,0),=EO,=>
 
 " Only define the function once.
 if exists("*GetRIndent")
-	finish
+  finish
 endif
 
-function GetRIndent()
-	" Find a non-blank line above the current line.
-	let lnum = prevnonblank(v:lnum - 1)
-	" Hit the start of the file, use zero indent.
-	if lnum == 0
-		return 0
+" Delete from '#' to the end of the line, unless the '#' is inside a string.
+function! s:SanitizeRLine(line)
+  let newline = a:line
+  let llen = strlen(newline)
+  let i = 0
+  let isSquo = 0
+  let isDquo = 0
+  while i < llen
+	if newline[i] == '"' && isSquo == 0
+	  if isDquo && (newline[i-1] != "\\" || (newline[i-1] == "\\" && newline[i-2] == "\\"))
+		let isDquo = 0
+	  else
+		let isDquo = 1
+	  endif
 	endif
-    
-	let line = getline(lnum)      " last line
-	let cline = getline(v:lnum)   " current line
-	let pline = getline(lnum - 1) " previous to last line
-	let ind = indent(lnum)
-
-	" Indent blocks enclosed by {} or ()
-	"if line =~ '[{(]\s*\(#[^)}]*\)\=$'
-	if line =~ '[{(]\s*[^)}]*$'
-		let ind = ind + &sw
+	if newline[i] == "'" && isDquo == 0
+	  if isSquo
+		let isSquo = 0
+	  else
+		let isSquo = 1
+	  endif
 	endif
-	if cline =~ '^\s*[)}]'
-		let ind = ind - &sw
+	if isDquo == 1 || isSquo == 1
+	  if newline[i] == '#' || newline[i] == '(' || newline[i] == ')' || newline[i] == '{' || newline[i] == '}'
+		let newline = newline[0:(i - 1)] . "a" . newline[(i+1):(llen -1)]
+	  endif
 	endif
-    
-	return ind
+	let i += 1
+  endwhile
+  let newline = substitute(newline, '#.*', "", "")
+  return newline
 endfunction
-" vim: set ts=4 sw=4:
+
+function GetRIndent()
+  " Find a non-blank line above the current line.
+  let lnum = prevnonblank(v:lnum - 1)
+  " Hit the start of the file, use zero indent.
+  if lnum == 0
+  	return 0
+  endif
+  
+  let line = getline(lnum)              " last line
+  let line = s:SanitizeRLine(line)      " last line
+  let cline = getline(v:lnum)           " current line
+  let cline = s:SanitizeRLine(cline)     " current line
+  let pline = getline(lnum - 1)         " previous to last line
+  let pline = s:SanitizeRLine(pline)     " previous to last line
+  let ind = indent(lnum)
+  
+  " Indent blocks enclosed by {} or ()
+  "if line =~ '[{(]\s*\(#[^)}]*\)\=$'
+  if line =~ '[{(]\s*[^)}]*$'
+  	let ind = ind + &sw
+  endif
+  if cline =~ '^\s*[)}]'
+  	let ind = ind - &sw
+  endif
+  
+  return ind
+endfunction
