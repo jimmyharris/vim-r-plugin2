@@ -104,8 +104,8 @@ endif
 
 " If there is no omnilist, copy the default one
 if !filereadable(b:user_vimfiles . "/r-plugin/omnilist")
-  if filereadable(b:r_plugin_home ."omnilist")
-    let x = readfile(b:r_plugin_home . "omnilist")
+  if filereadable(b:r_plugin_home ."/r-plugin/omnilist")
+    let x = readfile(b:r_plugin_home . "/r-plugin/omnilist")
     call writefile(x, b:user_vimfiles . "/r-plugin/omnilist")
   endif
 endif
