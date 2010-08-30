@@ -96,16 +96,16 @@ endif
 
 " If there is no functions.vim, copy the default one
 if !filereadable(b:user_vimfiles . "/r-plugin/functions.vim")
-  if filereadable("/usr/share/vim/addons/r-plugin/functions.vim")
-    let x = readfile("/usr/share/vim/addons/r-plugin/functions.vim")
+  if filereadable(b:r_plugin_home . "functions.vim")
+    let x = readfile(b:r_plugin_home . "functions.vim")
     call writefile(x, b:user_vimfiles . "/r-plugin/functions.vim")
   endif
 endif
 
 " If there is no omnilist, copy the default one
 if !filereadable(b:user_vimfiles . "/r-plugin/omnilist")
-  if filereadable("/usr/share/vim/addons/r-plugin/omnilist")
-    let x = readfile("/usr/share/vim/addons/r-plugin/omnilist")
+  if filereadable(b:r_plugin_home ."omnilist")
+    let x = readfile(b:r_plugin_home . "omnilist")
     call writefile(x, b:user_vimfiles . "/r-plugin/omnilist")
   endif
 endif
