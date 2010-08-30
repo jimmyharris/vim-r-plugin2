@@ -1,20 +1,28 @@
+"  This program is free software; you can redistribute it and/or modify
+"  it under the terms of the GNU General Public License as published by
+"  the Free Software Foundation; either version 2 of the License, or
+"  (at your option) any later version.
+"
+"  This program is distributed in the hope that it will be useful,
+"  but WITHOUT ANY WARRANTY; without even the implied warranty of
+"  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+"  GNU General Public License for more details.
+"
+"  A copy of the GNU General Public License is available at
+"  http://www.r-project.org/Licenses/
+
 "==========================================================================
 " ftplugin for R files
 "
 " Authors: Jakson Alves de Aquino <jalvesaq@gmail.com>
-"          José Cláudio Faria <joseclaudio.faria@gmail.com>
+"          José Cláudio Faria
 "          
 "          Based on previous work by Johannes Ranke
 "
-" Last Change: 2010/05/12
+" Last Change: Tue Aug 24, 2010  01:25PM
 "
 " Please see doc/r-plugin.txt for usage details.
 "==========================================================================
-
-" This plugin does not work on Windows
-if has("gui_win32")
-  finish
-endif
 
 " Only do this when not yet done for this buffer
 if exists("b:did_ftplugin")
@@ -24,27 +32,131 @@ endif
 " Don't load another plugin for this buffer
 let b:did_ftplugin = 1
 
-" Control the menu R
-let b:hasrmenu = 0
+let b:replace_us = 1
+if exists("g:vimrplugin_underscore")
+  if g:vimrplugin_underscore != 0
+    let b:replace_us = 0
+  endif
+endif
 
-" Automatically rebuild the 'tags' file for omni completion if the user press
-" <C-X><C-O> and we know that the file either was not created yet or is
-" outdated.
-let b:needsnewtags = 1
+function! RWarningMsg(wmsg)
+  echohl WarningMsg
+  echomsg a:wmsg
+  echohl Normal
+endfunction
+
+" Set completion with CTRL-X CTRL-O to autoloaded function.
+if exists('&ofu')
+  setlocal ofu=rcomplete#CompleteR
+endif
+
+function! ReplaceUnderS()
+  let j = col(".")
+  let s = getline(".")
+  if j > 3 && s[j-3] == "<" && s[j-2] == "-" && s[j-1] == " "
+    execute "normal! 3h3xr_"
+    return
+  endif
+  let isString = 0
+  let i = 0
+  while i < j
+    if s[i] == '"'
+      if isString == 0
+	let isString = 1
+      else
+	let isString = 0
+      endif
+    endif
+    let i += 1
+  endwhile
+  if isString == 0
+    execute "normal! a <- "
+  else
+    execute "normal! a_"
+  endif
+endfunction
+
+" Replace 'underline' with '<-'
+if b:replace_us
+  imap <buffer> _ <Esc>:call ReplaceUnderS()<CR>a
+endif
 
 " Save r plugin home - necessary to make vim-r-plugin2 work with pathogen
 let b:r_plugin_home = expand("<sfile>:h:h")
 
-" Keeps the libraries tag list in memory to avoid the need of reading the file
+" Save user_vimfiles
+let b:user_vimfiles = split(&runtimepath, ",")[0]
+
+
+" Are we in a Debian package? Is the plugin being running for the first time?
+" Create r-plugin directory if it doesn't exist yet:
+if !isdirectory(b:user_vimfiles . "/r-plugin")
+  call mkdir(b:user_vimfiles . "/r-plugin", "p")
+endif
+
+" If there is no functions.vim, copy the default one
+if !filereadable(b:user_vimfiles . "/r-plugin/functions.vim")
+  if filereadable("/usr/share/vim/addons/r-plugin/functions.vim")
+    let x = readfile("/usr/share/vim/addons/r-plugin/functions.vim")
+    call writefile(x, b:user_vimfiles . "/r-plugin/functions.vim")
+  endif
+endif
+
+" If there is no omnilist, copy the default one
+if !filereadable(b:user_vimfiles . "/r-plugin/omnilist")
+  if filereadable("/usr/share/vim/addons/r-plugin/omnilist")
+    let x = readfile("/usr/share/vim/addons/r-plugin/omnilist")
+    call writefile(x, b:user_vimfiles . "/r-plugin/omnilist")
+  endif
+endif
+
+" Keeps the libraries object list in memory to avoid the need of reading the file
 " repeatedly:
-let b:local_rtags_filename = b:r_plugin_home . "/tools/rtags"
-let b:flines1 = readfile(b:local_rtags_filename)
+let b:local_omni_filename = b:user_vimfiles . "/r-plugin/omnilist"
+let b:flines1 = readfile(b:local_omni_filename)
+
+if exists("g:vimrplugin_screenplugin") && !has('gui_running')
+  let b:usescreenplugin = 1
+else
+  let b:usescreenplugin = 0
+endif
+
+if exists("g:vimrplugin_r_path")
+  let b:rpath = g:vimrplugin_r_path
+else
+  let b:rpath = "R"
+endif
+
+" Automatically rebuild the file listing .GlobalEnv objects for omni
+" completion if the user press <C-X><C-O> and we know that the file either was
+" not created yet or is outdated.
+let b:needsnewomnilist = 1
+
+"==========================================================================
+" The remaining of the script needs screen which doesn't work on MS Windows
+"==========================================================================
+if has("gui_win32")
+  let b:usescreenplugin = 0
+  let b:needsnewomnilist = 0
+  finish
+endif
+"==========================================================================
+" This is the end for Windows users.
+"==========================================================================
+
+
+" How much time must wait for R to build the list of objects:
+if !exists("g:vimrplugin_buildwait")
+  let g:vimrplugin_buildwait = 120
+endif
+
+" Control the menu 'R' and the tool bar buttons
+if !exists("g:hasrmenu")
+  let g:hasrmenu = 0
+endif
 
 " Special screenrc file
 let b:scrfile = " "
-
-" Automatically source the script tools/rargs.R the first time <S-F1> is pressed:
-let b:needsrargs = 1
 
 " List of marks that the plugin seeks to find the block to be sent to R
 let s:all_marks = "abcdefghijklmnopqrstuvwxyz"
@@ -60,42 +172,18 @@ else
   endif
 endif
 
+" Make the R list of objects file name
+let b:romnilistfile = "/tmp/.R-omnilist-" . userlogin
+
+" Create an empty file to avoid errors if the users do Ctrl-X Ctrl-O before
+" starting R:
+call writefile([], b:romnilistfile)
+
 " Make the file name of files to be sourced
-let b:rsource = printf("/tmp/.Rsource-%s", userlogin)
-
-" Make the R 'tags' file name
-let b:rtagsfile = printf("/tmp/.Rtags-%s", userlogin)
-
-" Automatically call R's function help.start() the first time <C-H> is pressed:
-let b:needshstart = 0
-if exists("g:vimrplugin_hstart")
-  if g:vimrplugin_hstart == 1
-    let b:needshstart = 1
-  endif
-endif
-
-if exists("g:vimrplugin_browser_time") == 0
-  let g:vimrplugin_browser_time = 4
-endif
-
-let b:replace_us = 1
-if exists("g:vimrplugin_underscore")
-  if g:vimrplugin_underscore != 0
-    let b:replace_us = 0
-  endif
-endif
-
-if exists("g:vimrplugin_screenplugin") && !has('gui_running')
-  let b:usescreenplugin = 1
-else
-  let b:usescreenplugin = 0
-endif
-
-function! RWarningMsg(wmsg)
-  echohl WarningMsg
-  echomsg a:wmsg
-  echohl Normal
-endfunction
+let b:bname = expand("%:t")
+let b:bname = substitute(b:bname, " ", "",  "g")
+let b:rsource = "/tmp/.Rsource-" . userlogin . "-" . getpid() . "-" . b:bname
+unlet b:bname
 
 if !executable('screen')
   call RWarningMsg("Please, install 'screen' to run vim-r-plugin")
@@ -148,10 +236,10 @@ endif
 
 if exists("g:vimrplugin_nosingler")
   " Make a random name for the screen session
-  let b:screensname = printf("vimrplugin-%s-%s", userlogin, localtime())
+  let b:screensname = "vimrplugin-" . userlogin . "-" . localtime()
 else
   " Make a unique name for the screen session
-  let b:screensname = printf("vimrplugin-%s", userlogin)
+  let b:screensname = "vimrplugin-" . userlogin
 endif
 
 " Make a unique name for the screen process for each Vim instance:
@@ -165,11 +253,6 @@ if exists("g:vimrplugin_by_vim_instance")
     let sname = substitute(sname, "GVIM$", "GVIM0", "g")
     let b:screensname = "vimrplugin-" . userlogin . "-" . sname
   endif
-endif
-
-" Set completion with CTRL-X CTRL-O to autoloaded function.
-if exists('&ofu')
-  setlocal ofu=rcomplete#CompleteR
 endif
 
 " Count braces
@@ -216,37 +299,6 @@ function! GoDown()
   endwhile
 endfunction
 
-function! ReplaceUnderS()
-  let j = col(".")
-  let s = getline(".")
-  if j > 3 && s[j-3] == "<" && s[j-2] == "-" && s[j-1] == " "
-    execute "normal! 3h3xr_"
-    return
-  endif
-  let isString = 0
-  let i = 0
-  while i < j
-    if s[i] == '"'
-      if isString == 0
-	let isString = 1
-      else
-	let isString = 0
-      endif
-    endif
-    let i += 1
-  endwhile
-  if isString == 0
-    execute "normal! a <- "
-  else
-    execute "normal! a_"
-  endif
-endfunction
-
-" Replace 'underline' with '<-'
-if b:replace_us
-  imap <buffer> _ <Esc>:call ReplaceUnderS()<CR>a
-endif
-
 function! RWriteScreenRC()
   let b:scrfile = "/tmp/." . b:screensname . ".screenrc"
   if exists("g:vimrplugin_nosingler")
@@ -265,30 +317,19 @@ endfunction
 " Start R
 function! StartR(whatr)
   if a:whatr =~ "vanilla"
-    let rcmd = "R --vanilla"
+    let rcmd = b:rpath . " --vanilla"
   else
     if a:whatr =~ "R"
-      let rcmd = "R"
+      let rcmd = b:rpath
     else
       if a:whatr =~ "custom"
         call inputsave()
         let rargs = input('Enter parameters for R: ')
         call inputrestore()
-        let rcmd = "R " . rargs
+        let rcmd = b:rpath . " " . rargs
       endif
     endif
   endif
-  if !exists("g:vimrplugin_hstart")
-    let b:needshstart = 0
-  endif
-  if exists("g:vimrplugin_hstart")
-    if g:vimrplugin_hstart == 1
-      let b:needshstart = 1
-    else
-      let b:needshstart = 0
-    endif
-  endif
-  let b:needsrargs = 1
   if b:usescreenplugin
     exec 'ScreenShell ' . rcmd
   else
@@ -315,6 +356,28 @@ function! StartR(whatr)
   echon
 endfunction
 
+" Function to send commands
+function! SendCmdToScreen(cmd)
+  if b:usescreenplugin
+    if !exists("g:ScreenShellSend")
+      call RWarningMsg("Did you already start R?")
+      return 0
+    endif
+    call g:ScreenShellSend(a:cmd)
+    return 1
+  end
+  let str = substitute(a:cmd, "'", "'\\\\''", "g")
+  let scmd = 'screen -S ' . b:screensname . " -X stuff '" . str . "\<C-M>'"
+  let rlog = system(scmd)
+  if v:shell_error
+    let rlog = substitute(rlog, '\n', ' ', 'g')
+    let rlog = substitute(rlog, '\r', ' ', 'g')
+    call RWarningMsg(rlog)
+    return 0
+  endif
+  return 1
+endfunction
+
 " Quit R
 function! RQuit(how)
   if a:how == "save"
@@ -328,74 +391,44 @@ function! RQuit(how)
   echon
 endfunction
 
-" Function to send commands
-function! SendCmdToScreen(cmd)
-  if b:usescreenplugin
-    call g:ScreenShellSend(a:cmd)
-    return 1
-  end
-  let str = substitute(a:cmd, "'", "'\\\\''", "g")
-  let scmd = 'screen -S ' . b:screensname . " -X stuff '" . str . "\<C-M>'"
-  let rlog = system(scmd)
-  if v:shell_error
-    let rlog = substitute(rlog, '\n', '', 'g')
-    call RWarningMsg(rlog)
-    return 0
-  endif
-  return 1
-endfunction
-
-" Get word under cursor
+" Get the word either under or after the cursor.
+" Works for word(| where | is the cursor position.
 function! RGetKeyWord()
   " Go back some columns if character under cursor is not valid
+  let save_cursor = getpos(".")
   let curline = line(".")
   let line = getline(curline)
   " line index starts in 0; cursor index starts in 1:
   let i = col(".") - 1
-  while i > 0 && (line[i] == ' ' || line[i] == '(')
+  while i > 0 && "({[ " =~ line[i]
+    call setpos(".", [0, line("."), i])
     let i -= 1
   endwhile
-  " Go back until the begining of the word:
-  let wentback = 0
-  while i >= 0 && line[i] != ' ' && line[i] != '(' && line[i] != '[' && line[i] != '{' && line[i] != ','
-    let i -= 1
-    let wentback = 1
-  endwhile
-  let llen = strlen(line)
-  if wentback == 1
-    let i += 1
-  endif
-  let kstart = i
-  while i < llen && line[i] != ' ' && line[i] != '(' && line[i] != '[' && line[i] != '{' && line[i] != ','
-    let i += 1
-  endwhile
-  if (line[i-1] == ' ' || line[i-1] == ')' || line[i-1] == ']' || line[i-1] == '}' || line[i-1] == ',')
-    let i -= 1
-  endif
-  let rkeyword = strpart(line, kstart, i - kstart)
+  let save_keyword = &iskeyword
+  setlocal iskeyword=@,48-57,_,.,$
+  let rkeyword = expand("<cword>")
+  exe "setlocal iskeyword=" . save_keyword
+  call setpos(".", save_cursor)
   return rkeyword
 endfunction
 
-" Call R funtions for the word under cursor
+" Call R functions for the word under cursor
 function! RAction(rcmd)
   echon
   let rkeyword = RGetKeyWord()
   if strlen(rkeyword) > 0
     if a:rcmd == "help"
-      if b:needshstart == 1
-        let b:needshstart = 0
-        let ok = SendCmdToScreen("help.start()")
-        if ok == 0
-          return
-        endif
-        let wt = g:vimrplugin_browser_time
-        while wt > 0
-          sleep
-          let wt -= 1
-        endwhile
-      endif
+      call SendCmdToScreen("help(" . rkeyword . ")")
+      return
     endif
-    let raction = a:rcmd . "(" . rkeyword . ")"
+    let rfun = a:rcmd
+    if a:rcmd == "args" && exists('g:vimrplugin_listmethods') && g:vimrplugin_listmethods == 1
+      let rfun = ".vim.list.args"
+    endif
+    if a:rcmd == "plot" && exists('g:vimrplugin_specialplot') && g:vimrplugin_specialplot == 1
+      let rfun = ".vim.plot"
+    endif
+    let raction = rfun . "(" . rkeyword . ")"
     let ok = SendCmdToScreen(raction)
     if ok == 0
       return
@@ -582,7 +615,7 @@ function! SendLineToR(godown)
   echon
   let line = getline(".")
   if line =~ "<-"
-    let b:needsnewtags = 1
+    let b:needsnewomnilist = 1
   endif
   if &filetype == "rnoweb" && line =~ "^@$"
     if a:godown =~ "down"
@@ -645,41 +678,41 @@ function! RMakePDF()
   echon
 endfunction  
 
-" Tell R to create a 'tags' file (/tmp/.Rtags-user-time) listing all currently
-" available objects in its environment. The file is necessary omni completion.
-function! BuildRTags(globalenv)
-  if a:globalenv =~ "GlobalEnv"
-    let rtf = b:rtagsfile
-    let b:needsnewtags = 0
+" Tell R to create a list of objects file (/tmp/.R-omnilist-user-time) listing all currently
+" available objects in its environment. The file is necessary for omni completion.
+function! BuildROmniList(env)
+  if a:env =~ "GlobalEnv"
+    let rtf = b:romnilistfile
+    let b:needsnewomnilist = 0
   else
-    let rtf = b:local_rtags_filename
+    let rtf = b:local_omni_filename
   endif
-  let locktagsfile = rtf . ".locked"
-  call writefile(["Wait!"], locktagsfile)
-  let tagscmd = printf(".vimtagsfile <- \"%s\"", rtf)
-  let ok = SendCmdToScreen(tagscmd)
+  let omnilistcmd = printf(".vimomnilistfile <- \"%s\"", rtf)
+  let ok = SendCmdToScreen(omnilistcmd)
   if ok == 0
     return
   endif
-  let tagscmd = "source(\"" . b:r_plugin_home . "/tools/rtags.R\")"
-  call SendCmdToScreen(tagscmd)
-  " Wait while R is writing the tags file
+  let lockomnilistfile = rtf . ".locked"
+  call writefile(["Wait!"], lockomnilistfile)
+  let omnilistcmd = "source(\"" . b:r_plugin_home . "/r-plugin/build_omni_list.R\")"
+  call SendCmdToScreen(omnilistcmd)
+  " Wait while R is writing the list of object into the file
   sleep 70m
   let i = 0 
   let s = 0
-  while filereadable(locktagsfile)
+  while filereadable(lockomnilistfile)
     let s = s + 1
-    if s == 4 && a:globalenv !~ "GlobalEnv"
+    if s == 4 && a:env !~ "GlobalEnv"
       let s = 0
       let i = i + 1
-      let k = 120 - i
+      let k = g:vimrplugin_buildwait - i
       let themsg = "\rPlease, wait! [" . i . ":" . k . "]"
       echon themsg
     endif
     sleep 250m
-    if i == 120
-      call delete(locktagsfile)
-      call RWarningMsg("Two minutes is too much: no longer waiting.")
+    if i == g:vimrplugin_buildwait
+      call delete(lockomnilistfile)
+      call RWarningMsg("No longer waiting. See  :h vimrplugin_buildwait  for details.")
       return
     endif
   endwhile
@@ -689,16 +722,45 @@ function! BuildRTags(globalenv)
 endfunction
 
 function! RBuildSyntaxFile()
-  call BuildRTags("libraries")
+  call BuildROmniList("libraries")
   sleep 1
-  let syncmd = "grep ':function:\\|:standardGeneric:' " . b:local_rtags_filename . " | awk -F ':' '{print $1}' | fmt -66 | sed -e 's/^\\(.*\\)$/syn keyword rFunction \\1/' > " . b:r_plugin_home . "/tools/rfunctions"
-  let rlog = system(syncmd)
+  let b:flines1 = readfile(b:local_omni_filename)
+  let res = []
+  for line in b:flines1
+    if line =~ ':function:\|:standardGeneric:'
+      let line = substitute(line, ':.*', "", "")
+      let line = "syn keyword rFunction " . line
+      call add(res, line)
+    endif
+  endfor
+  call writefile(res, b:user_vimfiles . "/r-plugin/functions.vim")
+  unlet b:current_syntax
+  exe "runtime syntax/r.vim"
+endfunction
+
+" Run R CMD BATCH on current file and load the resulting .Rout in a split
+" window
+function! ShowRout()
+  let routfile = expand("%:r") . ".Rout"
+  if bufloaded(routfile)
+    exe "bunload " . routfile
+  endif
+  " if not silent, the user will have to type <Enter>
+  silent update
+  let rcmd = b:rpath " CMD BATCH '" . expand("%") . "'"
+  echo "Please wait for: " . rcmd
+  let rlog = system(rcmd)
   if v:shell_error
     call RWarningMsg(rlog)
     return
   endif
-  call RWarningMsg("The syntax will be updated next time you load an R file.")
+  if exists("g:vimrplugin_routnotab") && g:vimrplugin_routnotab == 1
+    exe "split " . routfile
+  else
+    exe "tabnew " . routfile
+  endif
 endfunction
+
 
 " Integration with Norm Matloff's edtdbg package.
 function! RStartDebug()
@@ -717,18 +779,18 @@ function! RStartDebug()
     let scrrc = RWriteScreenRC()
   endif
   if b:term_cmd =~ "gnome-terminal" || b:term_cmd =~ "xfce4-terminal"
-    let opencmd = b:term_cmd . " 'screen " . scrrc . " -d -RR -S VimRdebug R' &"
+    let opencmd = b:term_cmd . " 'screen " . scrrc . " -d -RR -S VimRdebug " . b:rpath . "' &"
   else
-    let opencmd = b:term_cmd . " screen " . scrrc . " -d -RR -S VimRdebug R &"
+    let opencmd = b:term_cmd . " screen " . scrrc . " -d -RR -S VimRdebug " . b:rpath . " &"
   endif
   let rlog = system(opencmd)
   if v:shell_error
     call RWarningMsg(rlog)
     return
   endif
-  call SendCmdToScreen('source("' . b:r_plugin_home . '/tools/Clnt.r")')
+  call SendCmdToScreen('source("' . b:user_vimfiles . '/r-plugin/Clnt.r")')
   let curline = line(".")
-  let scmd = "screen -S VimRdebug -X stuff 'source(\"" . b:r_plugin_home . "/tools/Srvr.r\") ; editsrvr(vimserver=\"" . v:servername . "\") ; quit(\"no\")" . "\<C-M>'"
+  let scmd = "screen -S VimRdebug -X stuff 'source(\"" . b:user_vimfiles . "/r-plugin/Srvr.r\") ; editsrvr(vimserver=\"" . v:servername . "\") ; quit(\"no\")" . "\<C-M>'"
   sleep 3
   let rlog = system(scmd)
   if v:shell_error
@@ -800,7 +862,7 @@ endfunction
 " Start
 "-------------------------------------
 call s:RCreateMaps("nvi", '<Plug>RStart',        'rf', ':call StartR("R")')
-call s:RCreateMaps("nvi", '<Plug>RvanillaStart', 'rv', ':call StartR("vanilla")')
+call s:RCreateMaps("nvi", '<Plug>RVanillaStart', 'rv', ':call StartR("vanilla")')
 call s:RCreateMaps("nvi", '<Plug>RCustomStart',  'rc', ':call StartR("custom")')
 
 " Close
@@ -815,6 +877,7 @@ call s:RCreateMaps("nvi", '<Plug>RSaveClose',    'rw', ":call RQuit('save')")
 "-------------------------------------
 call s:RCreateMaps("ni", '<Plug>RSendFile',      'aa', ':call SendFileToR("silent")')
 call s:RCreateMaps("ni", '<Plug>RESendFile',     'ae', ':call SendFileToR("echo")')
+call s:RCreateMaps("ni", '<Plug>RShowRout',     'ao', ':call ShowRout()')
 
 " Block
 "-------------------------------------
@@ -897,9 +960,9 @@ call s:RCreateMaps("nvi", '<Plug>RSetwd',        'rd', ':call RSetWD()')
 call s:RCreateMaps("nvi", '<Plug>RSweave',       'sw', ':call RSweave()')
 call s:RCreateMaps("nvi", '<Plug>RMakePDF',      'sp', ':call RMakePDF()')
 
-" Build tags file for omni completion
+" Build list of objects for omni completion
 "-------------------------------------
-call s:RCreateMaps("nvi", '<Plug>RBuildTags',    'ro', ':call BuildRTags("GlobalEnv")')
+call s:RCreateMaps("nvi", '<Plug>RBuildOmniList',    'ro', ':call BuildROmniList("GlobalEnv")')
 
 "----------------------------------------------------------------------------
 " ***Debug***
@@ -908,6 +971,67 @@ call s:RCreateMaps("nvi", '<Plug>RBuildTags',    'ro', ':call BuildRTags("Global
 "-------------------------------------
 "call s:RCreateMaps("nvi", '<Plug>RDebug', 'dd', ':call RStartDebug()')
 
+redir => b:kblist
+silent imap
+silent vmap
+silent nmap
+redir END
+let b:kblist2 = split(b:kblist, "\n")
+unlet b:kblist
+let b:imaplist = []
+let b:vmaplist = []
+let b:nmaplist = []
+for i in b:kblist2
+  if i =~ "<Plug>R"
+    let si = split(i)
+    if len(si) == 3
+      if si[0] =~ "v"
+	call add(b:vmaplist, si)
+      endif
+      if si[0] =~ "i"
+	call add(b:imaplist, si)
+      endif
+      if si[0] =~ "n"
+	call add(b:nmaplist, si)
+      endif
+    else
+      if len(si) == 2
+	call add(b:nmaplist, si)
+      endif
+    endif
+  endif
+endfor
+unlet b:kblist2
+
+function! RNMapCmd(plug)
+  for [el1, el2] in b:nmaplist
+    if el2 == a:plug
+      return el1
+    endif
+  endfor
+endfunction
+
+function! RIMapCmd(plug)
+  for [el1, el2, el3] in b:imaplist
+    if el3 == a:plug
+      return el2
+    endif
+  endfor
+endfunction
+
+function! RVMapCmd(plug)
+  for [el1, el2, el3] in b:vmaplist
+    if el3 == a:plug
+      return el2
+    endif
+  endfor
+endfunction
+
+if exists('g:maplocalleader')
+  let b:tll = '<Tab>' . g:maplocalleader
+else
+  let b:tll = '<Tab>\\'
+endif
 
 function! s:RCreateMenuItem(type, label, plug, combo, target)
   if a:type =~ '0'
@@ -919,30 +1043,33 @@ function! s:RCreateMenuItem(type, label, plug, combo, target)
   endif
   if a:type =~ "n"
     if hasmapto(a:plug, "n")
-      exec 'nmenu &R.' . a:label . ' ' . tg
+      let boundkey = RNMapCmd(a:plug)
+      exec 'nmenu &R.' . a:label . '<Tab>' . boundkey . ' ' . tg
     else
-      exec 'nmenu &R.' . a:label . '<Tab>\\' . a:combo . ' ' . tg
+      exec 'nmenu &R.' . a:label . b:tll . a:combo . ' ' . tg
     endif
   endif
   if a:type =~ "v"
     if hasmapto(a:plug, "v")
-      exec 'vmenu &R.' . a:label . ' ' . tg
+      let boundkey = RVMapCmd(a:plug)
+      exec 'vmenu &R.' . a:label . '<Tab>' . boundkey . ' ' . tg
     else
-      exec 'vmenu &R.' . a:label . '<Tab>\\' . a:combo . ' ' . '<Esc>' . tg
+      exec 'vmenu &R.' . a:label . b:tll . a:combo . ' ' . '<Esc>' . tg
     endif
   endif
   if a:type =~ "i"
     if hasmapto(a:plug, "i")
-      exec 'imenu &R.' . a:label . ' ' . tg . il
+      let boundkey = RIMapCmd(a:plug)
+      exec 'imenu &R.' . a:label . '<Tab>' . boundkey . ' ' . tg
     else
-      exec 'imenu &R.' . a:label . '<Tab>\\' . a:combo . ' ' . '<Esc>' . tg . il
+      exec 'imenu &R.' . a:label . b:tll . a:combo . ' ' . '<Esc>' . tg . il
     endif
   endif
 endfunction
 
 " Menu R
 function! MakeRMenu()
-  if b:hasrmenu == 1
+  if g:hasrmenu == 1
     return
   endif
 
@@ -950,7 +1077,7 @@ function! MakeRMenu()
   " Start/Close
   "----------------------------------------------------------------------------
   call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ (default)', '<Plug>RStart', 'rf', ':call StartR("R")')
-  call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ --vanilla', '<Plug>RvanillaStart', 'rv', ':call StartR("vanilla")')
+  call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ --vanilla', '<Plug>RVanillaStart', 'rv', ':call StartR("vanilla")')
   call s:RCreateMenuItem("nvi", 'Start/Close.Start\ R\ (custom)', '<Plug>RCustomStart', 'rc', ':call StartR("custom")')
   "-------------------------------
   menu R.Start/Close.-Sep1- <nul>
@@ -962,6 +1089,7 @@ function! MakeRMenu()
   "----------------------------------------------------------------------------
   call s:RCreateMenuItem("ni", 'Send.File', '<Plug>RSendFile', 'aa', ':call SendFileToR("silent")')
   call s:RCreateMenuItem("ni", 'Send.File\ (echo)', '<Plug>RESendFile', 'ae', ':call SendFileToR("echo")')
+  call s:RCreateMenuItem("ni", 'Send.File\ (open\ \.Rout)', '<Plug>RShowRout', 'ao', ':call ShowRout()')
   "-------------------------------
   menu R.Send.-Sep1- <nul>
   call s:RCreateMenuItem("ni", 'Send.Block\ (cur)', '<Plug>RSendMBlock', 'bb', ':call SendMBlockToR("silent", "stay")')
@@ -995,7 +1123,7 @@ function! MakeRMenu()
   if hasmapto('<Plug>RSendLAndOpenNewOne')
     imenu R.Send.Line\ (and\ new\ one) <Plug>RSendLAndOpenNewOne <Esc>:call SendLineToR("stay")<CR>o
   else
-    imenu R.Send.Line\ (and\ new\ one)<Tab>\\q <Esc>:call SendLineToR("stay")<CR>o
+    exe "imenu R.Send.Line\\ (and\\ new\\ one)" . b:tll . 'q <Esc>:call SendLineToR("stay")<CR>o'
   endif
 
   "----------------------------------------------------------------------------
@@ -1028,14 +1156,15 @@ function! MakeRMenu()
   call s:RCreateMenuItem("nvi", 'Control.Sweave\ and\ PDF\ (cur\ file)', '<Plug>RMakePDF', 'sp', ':call RMakePDF()')
   "-------------------------------
   menu R.Control.-Sep6- <nul>
-  call s:RCreateMenuItem("nvi", 'Control.Rebuild\ list\ of\ objects', '<Plug>RBuildTags', 'ro', ':call BuildRTags("GlobalEnv")')
+  call s:RCreateMenuItem("nvi", 'Control.Rebuild\ list\ of\ objects', '<Plug>RBuildOmniList', 'ro', ':call BuildROmniList("GlobalEnv")')
   "-------------------------------
   menu R.-Sep7- <nul>
 
   "----------------------------------------------------------------------------
-  " About
+  " Help
   "----------------------------------------------------------------------------
-  amenu R.About\ the\ plugin :help vim-r-plugin<CR>
+  amenu R.r-plugin\ Help :help vim-r-plugin<CR>
+  amenu R.R\ Help :call SendCmdToScreen("help.start()")<CR>
 
   "----------------------------------------------------------------------------
   " ToolBar
@@ -1067,7 +1196,7 @@ function! MakeRMenu()
   tmenu ToolBar.RListSpace List objects
   tmenu ToolBar.RClear Clear the console screen
   tmenu ToolBar.RClearAll Remove objects from workspace and clear the console screen
-  let b:hasrmenu = 1
+  let g:hasrmenu = 1
 endfunction
 
 function! DeleteScreenRC()
@@ -1078,7 +1207,13 @@ endfunction
 
 function! UnMakeRMenu()
   call DeleteScreenRC()
-  if b:hasrmenu == 0
+  if exists("g:hasrmenu") && g:hasrmenu == 0
+    return
+  endif
+  if exists("g:vimrplugin_never_unmake_menu") && g:vimrplugin_never_unmake_menu == 1
+    return
+  endif
+  if &previewwindow			" don't do this in the preview window
     return
   endif
   aunmenu R
@@ -1093,58 +1228,15 @@ function! UnMakeRMenu()
   aunmenu ToolBar.RSendFile
   aunmenu ToolBar.RClose
   aunmenu ToolBar.RStart
-  let b:hasrmenu = 0
+  let g:hasrmenu = 0
 endfunction
 
 " Activate the menu and toolbar buttons if the user sets the file type as 'r':
 call MakeRMenu()
 
 augroup VimRPlugin
-  au FileType * if (&filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp") | call MakeRMenu() | endif
-  au BufEnter * if (&filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp") | call MakeRMenu() | endif
-  au BufLeave * if (&filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp") | call UnMakeRMenu() | endif
+  au FileType * if &filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp" | call MakeRMenu() | endif
+  au BufEnter * if &filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp" | call MakeRMenu() | endif
+  au BufLeave * if &filetype == "r" || &filetype == "rnoweb" || &filetype == "rhelp" | call UnMakeRMenu() | endif
 augroup END
-
-"==========================================================================
-" CHANGELOG FOR DEVELOPERS
-"==========================================================================
-"
-" CHANGES SINCE 091004 (2009 OCT 04)
-"-----------------------------------
-" * RAction() now receives the name of the function to call. The quotes were
-"   eliminated since they were not strictly necessary and, now, the user can
-"   create key bindings to call any R function.
-" 
-" * Replaced <Leader> with <LocalLeader> because Vim documentation recommends
-"   the use of LocalLeader in file type plugins.
-" 
-" * Removed argument "t" from SendSelectionToR() because it was no longer used.
-" 
-" * Rnoweb related key bindings activated by default to allow the use of the
-"   plugin as a global plugin (through the creation of a symbolic link to
-"   ftplugin/r.vim in the plugin directory).
-"
-" * Syntax highlight: recognition of special characters inside character
-"   strings.
-"
-" * Integration with screen.vim
-"
-" * New function: RCreateMaps()
-"
-" * Changes in key binding for Send functions.
-"
-" * New function RCreateMenuItem()
-"
-" * New function RBuildSyntaxFile and new command RUpdateObjList
-" 
-" * Send commands to R even when the line is '^@$' in Rnoweb file. Send line
-" is the only exception.
-" 
-" * Added 'info' field to omni completion. Thanks to Ben Kujala for writing
-" the original code!
-"
-" * New function: RStartDebug(): integration with Norm Matloff's edtdbg package.
-"
-" * Added option g:vimrplugin_by_vim_instance
-"
 
