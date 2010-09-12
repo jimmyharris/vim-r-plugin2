@@ -96,6 +96,12 @@ else
   let b:usescreenplugin = 0
 endif
 
+if exists("g:vimrplugin_conqueplugin")
+  let b:useconqueplugin = 1
+else
+  let b:useconqueplugin = 0
+endif
+
 function! RWarningMsg(wmsg)
   echohl WarningMsg
   echomsg a:wmsg
@@ -271,6 +277,8 @@ function! StartR(whatr)
   let b:needsrargs = 1
   if b:usescreenplugin
     exec 'ScreenShell ' . rcmd
+  elseif b:useconqueplugin
+    exec 'ConqueTermVSplit '.rcmd
   else
     if exists("g:vimrplugin_noscreenrc")
       let scrrc = " "
@@ -304,6 +312,8 @@ function! RQuit(how)
   endif
   if b:usescreenplugin && exists(':ScreenQuit')
       ScreenQuit
+  elseif b:useconqueplugin
+      execute 'bwipeout '.g:ConqueTerm_Idx
   endif
   echon
 endfunction
@@ -312,6 +322,9 @@ endfunction
 function! SendCmdToScreen(cmd)
   if b:usescreenplugin
     call g:ScreenShellSend(a:cmd)
+    return 1
+  elseif b:useconqueplugin
+    execute "python ".g:ConqueTerm_Var.'.write(vim.eval("a:cmd")+"\n")'
     return 1
   end
   let str = substitute(a:cmd, "'", "'\\\\''", "g")
